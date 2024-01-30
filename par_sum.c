@@ -134,9 +134,9 @@ void enqueue(TaskQueue* queue, Task task) {
 // Dequeue a task from the task queue
 Task dequeue(TaskQueue* queue) {
     // Wait until the queue is not empty
-    while (queue->size == 0) {
-        pthread_cond_wait(&not_empty, &mutex);
-    }
+    //while (queue->size == 0) {
+    //    pthread_cond_wait(&not_empty, &mutex);
+    //}
 
     // Dequeue the task
     Task task = queue->tasks[queue->front];
