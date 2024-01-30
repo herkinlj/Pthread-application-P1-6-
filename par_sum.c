@@ -28,8 +28,6 @@ typedef struct {
     size_t capacity;
     size_t front;
     size_t rear;
-    pthread_cond_t not_empty;
-    pthread_cond_t not_full;
     bool done;
 } TaskQueue;
 
@@ -39,6 +37,8 @@ long odd = 0;
 long min = INT_MAX;
 long max = INT_MIN;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t not_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t not_full = PTHREAD_COND_INITIALIZER;
 
 // Function prototypes
 void update(long number);
@@ -54,16 +54,14 @@ void initTaskQueue(TaskQueue* queue, size_t capacity) {
     queue->front = 0;
     queue->rear = 0;
     queue->done = false;
-    pthread_cond_init(&queue->not_empty, NULL);
-    pthread_cond_init(&queue->not_full, NULL);
 }
 
 // Destroy the task queue
 void destroyTaskQueue(TaskQueue* queue) {
     free(queue->tasks);
     pthread_mutex_destroy(&mutex);
-    pthread_cond_destroy(&queue->not_empty);
-    pthread_cond_destroy(&queue->not_full);
+    pthread_cond_destroy(&not_empty);
+    pthread_cond_destroy(&not_full);
 }
 
 // Update global aggregate variables given a number
@@ -94,7 +92,7 @@ void* worker_function(void* arg) {
 
         // Wait until the queue is not empty or done
         while (queue->size == 0 && !queue->done) {
-            pthread_cond_wait(&queue->not_empty, &mutex);
+            pthread_cond_wait(&not_empty, &mutex);
         }
 
         // If the queue is empty and done, exit the thread
@@ -121,7 +119,7 @@ void* worker_function(void* arg) {
 void enqueue(TaskQueue* queue, Task task) {
     // Wait until the queue is not full
     while (queue->size == queue->capacity) {
-        pthread_cond_wait(&queue->not_full, &mutex);
+        pthread_cond_wait(&not_full, &mutex);
     }
 
     // Enqueue the task
@@ -130,14 +128,14 @@ void enqueue(TaskQueue* queue, Task task) {
     queue->size++;
 
     // Signal that the queue is not empty
-    pthread_cond_signal(&queue->not_empty);
+    pthread_cond_signal(&not_empty);
 }
 
 // Dequeue a task from the task queue
 Task dequeue(TaskQueue* queue) {
     // Wait until the queue is not empty
     while (queue->size == 0) {
-        pthread_cond_wait(&queue->not_empty, &mutex);
+        pthread_cond_wait(&not_empty, &mutex);
     }
 
     // Dequeue the task
@@ -146,7 +144,7 @@ Task dequeue(TaskQueue* queue) {
     queue->size--;
 
     // Signal that the queue is not full
-    pthread_cond_signal(&queue->not_full);
+    pthread_cond_signal(&not_full);
 
     return task;
 }
@@ -209,7 +207,7 @@ int main(int argc, char* argv[]) {
     pthread_mutex_unlock(&mutex);
 
     // Wake up any waiting threads
-    pthread_cond_broadcast(&queue.not_empty);
+    pthread_cond_broadcast(&not_empty);
 
     // Wait for worker threads to finish
     for (int i = 0; i < num_threads; i++) {
